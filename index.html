@@ -4,8 +4,11 @@
         const url = 'wss://traze.iteratec.de:9443';
         const clientName = makeId();
         const instance = "1";
-        const playerTopic = 'traze/' + instance + '/player/' + clientName;
-        const tickerTopic = 'traze/' + instance + '/ticker';
+        const subscriptions = {
+            ['traze/' + instance + '/player/' + clientName]: onJoinSuccess,
+            ['traze/' + instance + '/ticker']: onTicker,
+            ['traze/' + instance + '/grid']: onGrid
+        };
         let playerId = 0;
         let secretToken = "";
         let client = null;
@@ -19,16 +22,14 @@
                 setStatus("Error: " + error);
             });
             client.on('message', function (topic, message) {
-                message = JSON.parse(message);
                 console.log(message);
-                if (topic == playerTopic) {
-                    onJoinSucess(message);
-                } else if (topic == tickerTopic) {
-                    onTicker(message);
+                if (subscriptions[topic]) {
+                    subscriptions[topic](message);
                 }
             });
-            client.subscribe(playerTopic);
-            client.subscribe(tickerTopic);
+            Object.keys(subscriptions).forEach(topic => {
+                client.subscribe(topic);
+            })
         }
         function join() {
             console.log("Join instance " + instance + " with clientName '" + clientName + "'");
@@ -38,7 +39,7 @@
               };
             client.publish('traze/' + instance + "/join", JSON.stringify(joinMsg));
         }
-        function onJoinSucess(message) {
+        function onJoinSuccess(message) {
             setStatus("Joined as: " + message.name);
             playerId = message.id;
             secretToken = message.secretUserToken;
@@ -51,6 +52,9 @@
                     join();
                 }, 3000);
             }
+        }
+        function onGrid(message) {
+            
         }
         function setStatus(status) {
             document.querySelector("#status").innerHTML = status;
