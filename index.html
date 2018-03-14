@@ -7,10 +7,14 @@
         const subscriptions = {
             ['traze/' + instance + '/player/' + clientName]: onJoinSuccess,
             ['traze/' + instance + '/ticker']: onTicker,
-            ['traze/' + instance + '/grid']: onGrid
+            ['traze/' + instance + '/grid']: onGrid,
+            ['traze/' + instance + '/players']: onPlayers
         };
         let playerId = 0;
         let secretToken = "";
+        let playerColors = {
+            0: 'black'
+        };
         let client = null;
         function connect () {
             client = mqtt.connect(url, {clientId: clientName});
@@ -22,7 +26,7 @@
                 setStatus("Error: " + error);
             });
             client.on('message', function (topic, message) {
-                console.log(message);
+                message = JSON.parse(message);
                 if (subscriptions[topic]) {
                     subscriptions[topic](message);
                 }
@@ -54,7 +58,38 @@
             }
         }
         function onGrid(message) {
-            
+            let gridHtml = "";
+            const grid = transformGrid(message);
+            grid.forEach(row => {
+                gridHtml += "<div class='row'>";
+                row.forEach(cell => {
+                    const color = playerColors[cell] || "white";
+                    gridHtml += "<span style='color: " + color + "'>X</span>";
+                });
+                gridHtml += "</div>";
+            });
+            document.querySelector('#grid').innerHTML = gridHtml;
+        }
+        function transformGrid(message) {
+            const grid = new Array(message.height);
+            for (let x = 0; x < message.width; x++) {
+                for (let y = 0; y < message.height; y++) {
+                    const targetY = message.height -y -1;
+                    grid[targetY] = grid[targetY] || new Array(grid.width);
+                    grid[targetY][x] = message.tiles[x][y];
+                }
+            }
+            return grid;
+        }
+        function onPlayers(message) {
+            let tableHtml = "";
+            message.forEach(player => {
+                playerColors[player.id] = player.color;
+                tableHtml += "<tr><td style='color:" + player.color +"'>" + player.name + "</td>"
+                    + "<td>" + player.frags + "</td>"
+                    + "<td>" + player.owned + "</td></tr>";
+            });
+            document.querySelector("#players tbody").innerHTML = tableHtml;
         }
         function setStatus(status) {
             document.querySelector("#status").innerHTML = status;
@@ -104,6 +139,33 @@
         connect();
         window.addEventListener('load', () => registerEvents());
     </script>
+    <style>
+        body {
+            background:#012438;
+            margin: 0;
+            font-family: monospace;
+            padding: 10px;
+            color: #eee;
+        }
+        #grid div {
+            display: flex;
+        }
+        #grid div span {
+            background: black;
+            font-size: 10px;
+            width: 10px;
+            height: 10px;
+            line-height: 10px;
+            text-align: center;
+        }
+        table thead {
+            font-weight: bold;
+        }
+        table th, table td {
+            padding: 2px 10px;
+            text-align: left;
+        }
+    </style>
     <body>
         <div id="status"></div>
         <div id="controls">
@@ -111,6 +173,17 @@
             <div><button id="steer-left" class="steer" disabled>Left</button><button id="steer-right" class="steer" disabled>Right</button></div>
             <div><button id="steer-down" class="steer" disabled>Down</button></div>
         </div>
+        <div id="grid"></div>
+        <table id="players">
+            <thead>
+                <tr>
+                    <th>Player</th>
+                    <th>Frags</th>
+                    <th>Owned</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
     </body>
 
 </html>
